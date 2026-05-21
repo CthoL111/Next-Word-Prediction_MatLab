@@ -6,7 +6,6 @@
 function vectors = oneHotEncode(vocab)
     n       = numel(vocab);
     vectors = containers.Map();
-
     for i = 1:n
         vec      = zeros(1, n);
         vec(i)   = 1;
@@ -16,19 +15,14 @@ end
 
 % --- Co-occurrence Matrix ---
 function coMatrix = buildCoOccurrence(tokens, vocab, windowSize)
-    if nargin < 3
-        windowSize = 2;
-    end
-
+    if nargin < 3, windowSize = 2; end
     n         = numel(vocab);
     wordIndex = containers.Map(vocab, 1:n);
     coMatrix  = zeros(n, n);
-
     for i = 1:numel(tokens)
         if ~isKey(wordIndex, tokens{i}), continue; end
         center = wordIndex(tokens{i});
-
-        for j = max(1, i-windowSize) : min(numel(tokens), i+windowSize)
+        for j = max(1,i-windowSize) : min(numel(tokens),i+windowSize)
             if j == i, continue; end
             if ~isKey(wordIndex, tokens{j}), continue; end
             context = wordIndex(tokens{j});
@@ -48,46 +42,25 @@ function sim = cosineSim(vec1, vec2)
 end
 
 % --- Predict by Vector Similarity ---
-function nextWord = predictByVector(coMatrix, vocab, words, topK)
+function nextWord = predictByVector(coMatrix, vocab, word, topK)
     if nargin < 4, topK = 3; end
-
-    wordIndex  = containers.Map(vocab, 1:numel(vocab));
-    inputWords = strsplit(strtrim(words));
-    vec        = zeros(1, size(coMatrix, 2));
-    found      = 0;
-
-    for w = 1:numel(inputWords)
-        if isKey(wordIndex, inputWords{w})
-            idx   = wordIndex(inputWords{w});
-            vec   = vec + coMatrix(idx, :);
-            found = found + 1;
-        end
-    end
-
-    if found == 0
+    wordIndex = containers.Map(vocab, 1:numel(vocab));
+    if ~isKey(wordIndex, word)
         nextWord = {};
-        fprintf('No known words in "%s".\n', words);
+        fprintf('Word "%s" not found.\n', word);
         return;
     end
-
-    vec  = vec / found;
-
+    widx = wordIndex(word);
+    vec  = coMatrix(widx, :);
     sims = zeros(1, numel(vocab));
     for i = 1:numel(vocab)
         sims(i) = cosineSim(vec, coMatrix(i,:));
     end
-
-    for w = 1:numel(inputWords)
-        if isKey(wordIndex, inputWords{w})
-            sims(wordIndex(inputWords{w})) = -inf;
-        end
-    end
-
+    sims(widx)              = -inf;
     [sortedSims, sortedIdx] = sort(sims, 'descend');
     topK     = min(topK, numel(vocab));
     nextWord = vocab(sortedIdx(1:topK));
-
-    fprintf('\nVector predictions after "%s":\n', words);
+    fprintf('\nVector predictions after "%s":\n', word);
     for k = 1:topK
         fprintf('  %d. %-15s (sim=%.4f)\n', k, nextWord{k}, sortedSims(k));
     end
@@ -100,8 +73,7 @@ fprintf('=== PART 3: Vector Representations ===\n\n');
 
 % --- One-Hot Encoding ---
 fprintf('--- One-Hot Encoding ---\n');
-oneHot = oneHotEncode(corpus.vocab);
-
+oneHot  = oneHotEncode(corpus.vocab);
 exWords = corpus.vocab(1:min(3, numel(corpus.vocab)));
 for i = 1:numel(exWords)
     vec = oneHot(exWords{i});
@@ -117,12 +89,12 @@ coMatrix = buildCoOccurrence(trainTok, corpus.vocab, 2);
 fprintf('Matrix size: %dx%d\n', size(coMatrix,1), size(coMatrix,2));
 fprintf('\n');
 
-% --- Show Co-occurrence for sample word ---
+% --- Co-occurrence for "cat" ---
 fprintf('--- Co-occurrence counts for "cat" ---\n');
 wordIndex = containers.Map(corpus.vocab, 1:numel(corpus.vocab));
 if isKey(wordIndex, 'cat')
-    catIdx  = wordIndex('cat');
-    catRow  = coMatrix(catIdx, :);
+    catIdx = wordIndex('cat');
+    catRow = coMatrix(catIdx, :);
     [sortedC, sortedI] = sort(catRow, 'descend');
     fprintf('Words most common near "cat":\n');
     for k = 1:min(5, numel(corpus.vocab))
@@ -141,48 +113,27 @@ for i = 1:numel(testWords)
 end
 fprintf('\n');
 
-% --- Compare Bigram vs Trigram vs Vector ---
+% --- Compare Bigram vs Vector (inline - no external function) ---
+fprintf('--- Comparison: Bigram vs Vector ---\n');
 compareWords = {'cat', 'the', 'a'};
-fprintf('%-10s %-20s %-20s %-20s\n', 'Word', 'Bigram predicts', 'Trigram predicts', 'Vector predicts');
-fprintf('%s\n', repmat('-',1,70));
+fprintf('%-10s %-20s %-20s\n', 'Word', 'Bigram predicts', 'Vector predicts');
+fprintf('%s\n', repmat('-',1,50));
 
 for i = 1:numel(compareWords)
     w = compareWords{i};
 
+    % ---- bigram inline ----
     if ~isKey(bigramModel.bigram, w)
         bigramPred = 'unknown';
     else
         inner      = bigramModel.bigram(w);
-        nextWords  = keys(inner);
-        nextCounts = cell2mat(values(inner));
-        [~, idx]   = max(nextCounts);
-        bigramPred = nextWords{idx};
+        ws         = keys(inner);
+        counts     = cell2mat(values(inner));
+        [~, idx]   = max(counts);
+        bigramPred = ws{idx};
     end
 
-    triKey = [bigramPred ' ' w];
-    if isKey(trigramModel.trigram, triKey)
-        inner       = trigramModel.trigram(triKey);
-        nextWords   = keys(inner);
-        nextCounts  = cell2mat(values(inner));
-        [~, idx]    = max(nextCounts);
-        trigramPred = nextWords{idx};
-    else
-        trigramPred = 'unknown';
-        allKeys = keys(trigramModel.trigram);
-        for k = 1:numel(allKeys)
-            parts = strsplit(allKeys{k});
-            if strcmp(parts{end}, w)
-                inner       = trigramModel.trigram(allKeys{k});
-                nextWords   = keys(inner);
-                nextCounts  = cell2mat(values(inner));
-                [~, idx]    = max(nextCounts);
-                trigramPred = nextWords{idx};
-                break;
-            end
-        end
-    end
-
-    wordIndex = containers.Map(corpus.vocab, 1:numel(corpus.vocab));
+    % ---- vector inline ----
     if ~isKey(wordIndex, w)
         vectorPred = 'unknown';
     else
@@ -190,64 +141,155 @@ for i = 1:numel(compareWords)
         vec  = coMatrix(widx, :);
         sims = zeros(1, numel(corpus.vocab));
         for j = 1:numel(corpus.vocab)
-            other = coMatrix(j, :);
+            other = coMatrix(j,:);
             denom = norm(vec) * norm(other);
             if denom > 0
                 sims(j) = dot(vec, other) / denom;
             end
         end
-        sims(widx) = -inf;
+        sims(widx)   = -inf;
         [~, bestIdx] = max(sims);
         vectorPred   = corpus.vocab{bestIdx};
     end
-
-    fprintf('%-10s %-20s %-20s %-20s\n', w, bigramPred, trigramPred, vectorPred);
+    fprintf('%-10s %-20s %-20s\n', w, bigramPred, vectorPred);
 end
 fprintf('\n');
+% ============================================================
+% INTERACTIVE LOOP (updated: 1 word = bigram+vector, 2 words = trigram+vector)
+% ============================================================
+fprintf('=== INTERACTIVE WORD TO VECTOR ===\n');
+fprintf('1 word input  → Bigram  + Vector prediction\n');
+fprintf('2 word input  → Trigram + Vector prediction\n');
+fprintf('Type "quit"   → Stop\n\n');
 
-% --- Interactive Vector Predictor ---
-fprintf('\n=== INTERACTIVE VECTOR PREDICTOR (Part 3) ===\n');
-fprintf('Type one or more words. Type "quit" to stop.\n\n');
+wordIdx = containers.Map(corpus.vocab, 1:corpus.vocabSize);
 
 while true
-    userWord = input('Enter word(s): ', 's');
+    userInput = input('Enter word(s): ', 's');
+    userInput = strtrim(lower(userInput));
 
-    if strcmp(strtrim(userWord), 'quit')
-        fprintf('Done.\n');
+    if strcmp(userInput, 'quit')
+        fprintf('Goodbye!\n');
         break;
     end
 
-    w = strtrim(lower(userWord));
+    inputWords = strsplit(userInput);
+    numWords   = numel(inputWords);
 
-    if ~isKey(bigramModel.bigram, w)
-        bp = 'unknown';
-    else
-        inner = bigramModel.bigram(w);
-        nw    = keys(inner);
-        nc    = cell2mat(values(inner));
-        [~,i] = max(nc);
-        bp    = nw{i};
+    % check all words are in vocabulary
+    allFound = true;
+    for w = 1:numWords
+        if ~isKey(wordIdx, inputWords{w})
+            fprintf('[!] "%s" not in vocabulary. Try: %s\n\n', ...
+                    inputWords{w}, strjoin(corpus.vocab(1:min(5,end)), ', '));
+            allFound = false;
+        end
     end
+    if ~allFound, continue; end
 
-    triKey = ['the ' w];
-    if isKey(trigramModel.trigram, triKey)
-        inner = trigramModel.trigram(triKey);
-        nw    = keys(inner);
-        nc    = cell2mat(values(inner));
-        [~,i] = max(nc);
-        tp    = nw{i};
-    else
-        tp = 'unknown';
+    % ============================================================
+    if numWords == 1
+        userWord = inputWords{1};
+        idx      = wordIdx(userWord);
+
+        % --- One-Hot Vector ---
+        fprintf('\n--- One-Hot Vector for "%s" ---\n', userWord);
+        vec = oneHot(userWord);
+        fprintf('[');
+        fprintf('%d ', vec(1:min(10, end)));
+        if corpus.vocabSize > 10
+            fprintf('... (%d dims total)', corpus.vocabSize);
+        end
+        fprintf(']\nPosition %d = 1, all others = 0\n\n', idx);
+
+        % --- Co-occurrence ---
+        fprintf('--- Co-occurrence Vector for "%s" ---\n', userWord);
+        row = coMatrix(idx, :);
+        [sorted, sortedI] = sort(row, 'descend');
+        for k = 1:min(5, corpus.vocabSize)
+            if sorted(k) <= 0, break; end
+            fprintf('  %-15s count = %.0f\n', corpus.vocab{sortedI(k)}, sorted(k));
+        end
+
+        % --- Top 5 Similar ---
+        fprintf('\n--- Top 5 Similar Words to "%s" ---\n', userWord);
+        vec  = coMatrix(idx, :);
+        sims = zeros(1, corpus.vocabSize);
+        for i = 1:corpus.vocabSize
+            sims(i) = cosineSim(vec, coMatrix(i,:));
+        end
+        sims(idx) = -inf;
+        [sortedSims, sortedIdx] = sort(sims, 'descend');
+        for k = 1:min(5, corpus.vocabSize-1)
+            fprintf('  %d. %-15s sim = %.4f\n', k, corpus.vocab{sortedIdx(k)}, sortedSims(k));
+        end
+
+        % --- Prediction ---
+        fprintf('\n--- Next Word Prediction for "%s" ---\n', userWord);
+
+        % Bigram
+        if isKey(bigramModel.bigram, userWord)
+            inner   = bigramModel.bigram(userWord);
+            ws      = keys(inner);
+            wCounts = cell2mat(values(inner));
+            [~, bi] = max(wCounts);
+            biPred  = ws{bi};
+            total   = bigramModel.unigram(userWord);
+            biProb  = inner(biPred) / total;
+            fprintf('Bigram  : "%s" → "%s" (prob: %.4f)\n', userWord, biPred, biProb);
+        else
+            fprintf('Bigram  : "%s" → unknown\n', userWord);
+        end
+
+        % Vector (single word row)
+        vecPred = corpus.vocab{sortedIdx(1)};
+        fprintf('Vector  : "%s" → "%s" (sim:  %.4f)\n\n', userWord, vecPred, sortedSims(1));
+
+    % ============================================================
+    elseif numWords >= 2
+        word1 = inputWords{numWords-1};
+        word2 = inputWords{numWords};
+        idx1  = wordIdx(word1);
+        idx2  = wordIdx(word2);
+
+        % --- Combined Vector (average of both word vectors) ---
+        fprintf('\n--- Combined Vector for "%s %s" ---\n', word1, word2);
+        vec1     = coMatrix(idx1, :);
+        vec2     = coMatrix(idx2, :);
+        combined = (vec1 + vec2) / 2;  % average = context vector
+        fprintf('(Average of "%s" and "%s" co-occurrence vectors)\n\n', word1, word2);
+
+        % --- Top 5 Similar to combined vector ---
+        fprintf('--- Top 5 Similar Words to "%s %s" ---\n', word1, word2);
+        sims = zeros(1, corpus.vocabSize);
+        for i = 1:corpus.vocabSize
+            sims(i) = cosineSim(combined, coMatrix(i,:));
+        end
+        sims(idx1) = -inf;  % exclude input words
+        sims(idx2) = -inf;
+        [sortedSims, sortedIdx] = sort(sims, 'descend');
+        for k = 1:min(5, corpus.vocabSize-1)
+            fprintf('  %d. %-15s sim = %.4f\n', k, corpus.vocab{sortedIdx(k)}, sortedSims(k));
+        end
+
+        % --- Prediction ---
+        fprintf('\n--- Next Word Prediction for "%s %s" ---\n', word1, word2);
+
+        % Trigram
+        triKey = [word1 ' ' word2];
+        if isKey(trigramModel.trigram, triKey)
+            inner   = trigramModel.trigram(triKey);
+            ws      = keys(inner);
+            wCounts = cell2mat(values(inner));
+            [~, ti] = max(wCounts);
+            triPred = ws{ti};
+            fprintf('Trigram : "%s %s" → "%s"\n', word1, word2, triPred);
+        else
+            fprintf('Trigram : "%s %s" → unknown (pair not seen in training)\n', word1, word2);
+        end
+
+        % Vector (combined/averaged)
+        vecPred = corpus.vocab{sortedIdx(1)};
+        fprintf('Vector  : "%s %s" → "%s" (sim:  %.4f)\n\n', word1, word2, vecPred, sortedSims(1));
     end
-
-    preds = predictByVector(coMatrix, corpus.vocab, w, 1);
-    if isempty(preds)
-        vp = 'unknown';
-    else
-        vp = preds{1};
-    end
-
-    fprintf('Bigram  : "%s" → "%s"\n', w, bp);
-    fprintf('Trigram : "the %s" → "%s"\n', w, tp);
-    fprintf('Vector  : "%s" → "%s"\n\n', w, vp);
 end
