@@ -35,9 +35,9 @@ counts = cell2mat(values(corpus.freqMap));
 sortedWords = words(idx);
 topN = min(20, numel(sortedWords));
 
-figure();
-bar(sortedCounts(1:topN));
-set(gca, 'XTick', 1:topN, 'XTickLabel', sortedWords(1:topN), 'XTickLabelRotation', 45);
+%figure();
+%bar(sortedCounts(1:topN));
+%set(gca, 'XTick', 1:topN, 'XTickLabel', sortedWords(1:topN), 'XTickLabelRotation', 45);
 
 fprintf('Most common words: ');
 fprintf('%s ', sortedWords{1:min(5,numel(sortedWords))});

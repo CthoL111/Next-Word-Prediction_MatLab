@@ -151,7 +151,7 @@ fprintf('1 word input  → Bigram prediction\n');
 fprintf('2 word input  → Trigram prediction\n');
 fprintf('Type "quit"   → Stop\n\n');
 
-while true
+while false
     userInput  = input('Enter word(s): ', 's');
 
     if strcmp(userInput, 'quit')
