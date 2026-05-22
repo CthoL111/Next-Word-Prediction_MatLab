@@ -2,20 +2,16 @@
 % PART 5: Application and Documentation (15%)
 % ============================================================
 
-% --- 1. Save Model ---
+% --- Save Model ---
 function saveModel(bigramModel, trigramModel, coMatrix, vocab, filename)
-    if nargin < 5
-        filename = 'nwp_model.mat';
-    end
+    if nargin < 5, filename = 'nwp_model.mat'; end
     save(filename, 'bigramModel', 'trigramModel', 'coMatrix', 'vocab');
-    fprintf('Model saved to: %s\n', filename);
+    fprintf('Model saved to  : %s\n', filename);
 end
 
-% --- 2. Load Model ---
+% --- Load Model ---
 function [bigramModel, trigramModel, coMatrix, vocab] = loadModel(filename)
-    if nargin < 1
-        filename = 'nwp_model.mat';
-    end
+    if nargin < 1, filename = 'nwp_model.mat'; end
     data         = load(filename);
     bigramModel  = data.bigramModel;
     trigramModel = data.trigramModel;
@@ -24,111 +20,101 @@ function [bigramModel, trigramModel, coMatrix, vocab] = loadModel(filename)
     fprintf('Model loaded from: %s\n', filename);
 end
 
-% --- 3. UI ---
-function launchUI(bigramModel, trigramModel, coMatrix, vocab, posMap)
+% --- UI ---
+function launchUI(bigramModel, trigramModel, coMatrix, vocab)
 
     fig = uifigure('Name', 'Next Word Predictor', ...
-                   'Position', [200 150 520 500]);
+                   'Position', [200 150 540 320]);
 
     % title
     uilabel(fig, ...
         'Text', 'Next Word Prediction', ...
-        'Position', [20 455 480 30], ...
+        'Position', [20 275 500 30], ...
         'FontSize', 16, ...
         'FontWeight', 'bold', ...
         'HorizontalAlignment', 'center');
 
-    % input field
-    uilabel(fig, 'Text', 'Type here:', ...
-        'Position', [20 415 80 22], ...
-        'FontWeight', 'bold');
-
-    inputField = uieditfield(fig, 'text', ...
-        'Position', [110 415 380 28], ...
-        'FontSize', 13, ...
-        'Placeholder', 'Start typing...', ...
-        'ValueChangedFcn', @(~,~) onInputChanged());
-
-    % model selector
-    uilabel(fig, 'Text', 'Model:', ...
-        'Position', [20 378 50 22], ...
-        'FontWeight', 'bold');
-
-    modeDD = uidropdown(fig, ...
-        'Items', {'Bigram','Trigram','Vector Similarity'}, ...
-        'Position', [80 378 150 25]);
-
-    % instruction label
+    % instruction
     uilabel(fig, ...
-        'Text', '↑↓ to move  |  Enter to select  |  Backspace to delete', ...
-        'Position', [20 350 480 20], ...
+        'Text', 'Bigram: 1 word  |  Trigram: 2 words  |  Vector: any words', ...
+        'Position', [20 250 500 20], ...
         'FontSize', 10, ...
         'FontColor', [0.5 0.5 0.5], ...
         'HorizontalAlignment', 'center');
 
-    % suggestion list
-    uilabel(fig, 'Text', 'Suggestions:', ...
-        'Position', [20 322 100 20], ...
+    % input label
+    uilabel(fig, 'Text', 'Type here:', ...
+        'Position', [20 213 80 22], ...
         'FontWeight', 'bold');
 
+    % input field
+    inputField = uieditfield(fig, 'text', ...
+        'Position', [110 213 410 26], ...
+        'FontSize', 13, ...
+        'Placeholder', 'e.g. cat  or  the cat', ...
+        'ValueChangedFcn', @(~,~) onInputChanged());
+
+    % model label
+    uilabel(fig, 'Text', 'Model:', ...
+        'Position', [20 175 50 22], ...
+        'FontWeight', 'bold');
+
+    % model dropdown
+    modeDD = uidropdown(fig, ...
+        'Items', {'Bigram','Trigram','Vector Similarity'}, ...
+        'Position', [80 175 200 25], ...
+        'ValueChangedFcn', @(~,~) onInputChanged());
+
+    % clear button
+    uibutton(fig, 'Text', 'Clear All', ...
+        'Position', [410 175 110 26], ...
+        'ButtonPushedFcn', @(~,~) clearAll());
+
+    % suggestions label
+    uilabel(fig, 'Text', 'Suggestions:', ...
+        'Position', [20 148 100 20], ...
+        'FontWeight', 'bold');
+
+    % suggestion listbox — double click adds word to input and searches again
     suggList = uilistbox(fig, ...
-        'Position', [20 180 480 140], ...
+        'Position', [20 20 500 125], ...
         'Items', {}, ...
         'FontSize', 13, ...
         'DoubleClickedFcn', @(~,~) onSuggestionSelected());
 
-    % chosen word display
-    uilabel(fig, 'Text', 'Chosen sentence:', ...
-        'Position', [20 148 150 22], ...
-        'FontWeight', 'bold');
-
-    chosenArea = uitextarea(fig, ...
-        'Position', [20 60 480 85], ...
-        'Editable', 'off', ...
-        'FontSize', 13);
-
-    % clear button
-    uibutton(fig, 'Text', 'Clear All', ...
-        'Position', [390 20 110 30], ...
-        'ButtonPushedFcn', @(~,~) clearAll());
-
-    % status
-    statusLabel = uilabel(fig, ...
-        'Text', 'Start typing to see suggestions...', ...
-        'Position', [20 20 360 22], ...
-        'FontColor', [0.3 0.6 0.3]);
-
-    % track chosen sentence
-    chosenWords = {};
-
     % ---- when user types ----
     function onInputChanged()
         inputText = strtrim(lower(inputField.Value));
+
+        if ~strcmp(inputField.Value, inputText)
+            inputField.Value = inputText;
+        end
+
         if isempty(inputText)
             suggList.Items = {};
-            statusLabel.Text = 'Start typing...';
             return;
         end
 
-        words     = strsplit(inputText);
-        words     = words(~cellfun('isempty', words));
-        numWords  = numel(words);
+        words       = strsplit(inputText);
+        words       = words(~cellfun('isempty', words));
+        numWords    = numel(words);
         modelChoice = modeDD.Value;
-        preds     = {};
+        preds       = {};
 
         try
             switch modelChoice
+
                 case 'Bigram'
                     w1 = words{end};
                     if isKey(bigramModel.bigram, w1)
-                        inner      = bigramModel.bigram(w1);
-                        ws         = keys(inner);
-                        counts     = cell2mat(values(inner));
-                        total      = sum(counts);
-                        [~, idx]   = sort(counts, 'descend');
-                        topK       = min(5, numel(ws));
+                        inner    = bigramModel.bigram(w1);
+                        ws       = keys(inner);
+                        counts   = cell2mat(values(inner));
+                        total    = sum(counts);
+                        [~, idx] = sort(counts, 'descend');
+                        topK     = min(5, numel(ws));
                         for k = 1:topK
-                            p     = counts(idx(k)) / total;
+                            p = counts(idx(k)) / total;
                             preds{end+1} = sprintf('%-15s  (%.2f%%)', ...
                                 ws{idx(k)}, p*100); %#ok
                         end
@@ -150,14 +136,13 @@ function launchUI(bigramModel, trigramModel, coMatrix, vocab, posMap)
                             end
                         end
                     else
-                        % fall back to bigram if only 1 word
                         w1 = words{end};
                         if isKey(bigramModel.bigram, w1)
-                            inner      = bigramModel.bigram(w1);
-                            ws         = keys(inner);
-                            counts     = cell2mat(values(inner));
-                            [~, idx]   = sort(counts, 'descend');
-                            topK       = min(5, numel(ws));
+                            inner    = bigramModel.bigram(w1);
+                            ws       = keys(inner);
+                            counts   = cell2mat(values(inner));
+                            [~, idx] = sort(counts, 'descend');
+                            topK     = min(5, numel(ws));
                             for k = 1:topK
                                 preds{end+1} = ws{idx(k)}; %#ok
                             end
@@ -165,118 +150,138 @@ function launchUI(bigramModel, trigramModel, coMatrix, vocab, posMap)
                     end
 
                 case 'Vector Similarity'
-                    w1        = words{end};
-                    wordIndex = containers.Map(vocab, 1:numel(vocab));
-                    if isKey(wordIndex, w1)
-                        widx = wordIndex(w1);
-                        vec  = coMatrix(widx,:);
-                        sims = zeros(1, numel(vocab));
+                    wordIndex  = containers.Map(vocab, 1:numel(vocab));
+                    combined   = zeros(1, numel(vocab));
+                    validCount = 0;
+
+                    for wi = 1:numel(words)
+                        if isKey(wordIndex, words{wi})
+                            widx     = wordIndex(words{wi});
+                            combined = combined + coMatrix(widx,:);
+                            validCount = validCount + 1;
+                        end
+                    end
+
+                    if validCount > 0
+                        combined = combined / validCount;
+                        sims     = zeros(1, numel(vocab));
+
                         for j = 1:numel(vocab)
                             other = coMatrix(j,:);
-                            denom = norm(vec)*norm(other);
+                            denom = norm(combined) * norm(other);
                             if denom > 0
-                                sims(j) = dot(vec,other)/denom;
+                                sims(j) = dot(combined, other) / denom;
                             end
                         end
-                        sims(widx) = -inf;
-                        [~, sortedIdx] = sort(sims,'descend');
+
+                        for wi = 1:numel(words)
+                            if isKey(wordIndex, words{wi})
+                                sims(wordIndex(words{wi})) = -inf;
+                            end
+                        end
+
+                        [sortedSims, sortedIdx] = sort(sims, 'descend');
                         topK = min(5, numel(vocab));
                         for k = 1:topK
-                            preds{end+1} = vocab{sortedIdx(k)}; %#ok
+                            preds{end+1} = sprintf('%-15s  (sim=%.4f)', ...
+                                vocab{sortedIdx(k)}, sortedSims(k)); %#ok
                         end
                     end
             end
 
             if isempty(preds)
-                suggList.Items = {'(no suggestions)'};
-                statusLabel.Text = sprintf('No predictions for "%s"', words{end});
+                suggList.Items = {'(no suggestions found)'};
             else
                 suggList.Items = preds;
-                suggList.Value = preds{1};  % select first by default
-                statusLabel.Text = sprintf('%d suggestions for "%s"', numel(preds), words{end});
             end
 
         catch ME
-            statusLabel.Text = ['Error: ' ME.message];
+            suggList.Items = {['Error: ' ME.message]};
         end
     end
 
-    % ---- when user clicks a suggestion ----
+    % ---- double click: append word to input then search again ----
     function onSuggestionSelected()
         selected = suggList.Value;
-        if isempty(selected) || strcmp(selected, '(no suggestions)')
+        if isempty(selected) || strcmp(selected, '(no suggestions found)')
             return;
         end
-    
-        % Extract just the word (remove probability display)
+
+        % extract just the word (strip probability text)
         parts = strsplit(strtrim(selected));
         word  = parts{1};
-    
-        % Sync with what is currently typed BEFORE appending
-        inputText  = strtrim(lower(inputField.Value));
-        typedWords = strsplit(inputText);
-        typedWords = typedWords(~cellfun('isempty', typedWords));
-    
-        % Build new sentence = typed words + chosen word
-        newWords  = [typedWords, {word}];
-        sentence  = strjoin(newWords, ' ');
-    
-        % Update displays
-        chosenArea.Value = sentence;         % ← Fix 2: always shows full sentence
-        statusLabel.Text = sprintf('Chosen: "%s" | Sentence: %s', word, sentence);
-    
-        % Update input for next prediction (without triggering chosenWords confusion)
-        chosenWords      = newWords;         % ← Fix 1: keep in sync manually
-        inputField.Value = sentence;
+
+        % append selected word to current input
+        current = strtrim(inputField.Value);
+        if isempty(current)
+            inputField.Value = word;
+        else
+            inputField.Value = [current ' ' word];
+        end
+
+        % trigger new search with updated input
         onInputChanged();
     end
-    
 
     % ---- clear everything ----
     function clearAll()
         inputField.Value = '';
         suggList.Items   = {};
-        chosenArea.Value = '';
-        chosenWords      = {};
-        statusLabel.Text = 'Cleared. Start typing...';
     end
 
 end
+
 % ============================================================
 % RUN PART 5
 % ============================================================
 fprintf('=== PART 5: Application and Documentation ===\n\n');
 
-% --- Save Model ---
-fprintf('--- Saving Model ---\n');
+% --- 1. Save Model ---
+fprintf('--- 1. Saving Model ---\n');
 saveModel(bigramModel, trigramModel, coMatrix, corpus.vocab);
 fprintf('\n');
 
-% --- Load Model (verify it works) ---
-fprintf('--- Loading Model ---\n');
+% --- 2. Load and Verify ---
+fprintf('--- 2. Loading Model (verify) ---\n');
 [bgModel, tgModel, coMat, voc] = loadModel('nwp_model.mat');
-fprintf('Loaded vocab size: %d\n', numel(voc));
+fprintf('Vocab size loaded : %d words\n',  numel(voc));
+fprintf('Bigram pairs      : %d\n',        numel(keys(bgModel.bigram)));
+fprintf('Trigram pairs     : %d\n',        numel(keys(tgModel.trigram)));
 fprintf('\n');
 
-% --- Results Analysis ---
-fprintf('--- Results Analysis ---\n');
-fprintf('Corpus size    : %d tokens\n',   numel(corpus.tokens));
+% --- 3. Results Analysis ---
+fprintf('--- 3. Results Analysis ---\n');
+fprintf('Corpus size    : %d tokens\n',       numel(corpus.tokens));
 fprintf('Vocabulary     : %d unique words\n', corpus.vocabSize);
-fprintf('Train tokens   : %d\n',          numel(trainTok));
-fprintf('Test tokens    : %d\n',          numel(testTok));
-fprintf('Bigram pairs   : %d\n',          numel(keys(bigramModel.bigram)));
-fprintf('Trigram pairs  : %d\n',          numel(keys(trigramModel.trigram)));
+fprintf('Train tokens   : %d  (80%%)\n',      numel(trainTok));
+fprintf('Test tokens    : %d  (20%%)\n',      numel(testTok));
+fprintf('Bigram pairs   : %d unique pairs\n', numel(keys(bigramModel.bigram)));
+fprintf('Trigram pairs  : %d unique pairs\n', numel(keys(trigramModel.trigram)));
+fprintf('Vector size    : %dx%d matrix\n',    size(coMatrix,1), size(coMatrix,2));
 fprintf('\n');
 
-% --- Suggestions for Improvement ---
-fprintf('--- Suggestions for Improvement ---\n');
-fprintf('1. Use larger corpus for better accuracy\n');
-fprintf('2. Add trigram smoothing (Kneser-Ney)\n');
-fprintf('3. Use Word2Vec instead of co-occurrence\n');
-fprintf('4. Add 4-gram model for more context\n');
-fprintf('5. Use neural network (LSTM) for predictions\n');
-fprintf('\n');
+% --- 4. Suggestions for Improvement ---
+fprintf('--- 4. Suggestions for Improvement ---\n\n');
+fprintf('1. LARGER CORPUS\n');
+fprintf('   Current : %d tokens\n', numel(corpus.tokens));
+fprintf('   Suggest : 10,000+ tokens for better accuracy\n\n');
+fprintf('2. BETTER SMOOTHING\n');
+fprintf('   Current : Laplace add-1\n');
+fprintf('   Suggest : Kneser-Ney smoothing\n\n');
+fprintf('3. BETTER WORD VECTORS\n');
+fprintf('   Current : Co-occurrence matrix\n');
+fprintf('   Suggest : Word2Vec or GloVe embeddings\n\n');
+fprintf('4. HIGHER N-GRAM\n');
+fprintf('   Current : Bigram and Trigram\n');
+fprintf('   Suggest : 4-gram or 5-gram for more context\n\n');
+fprintf('5. NEURAL NETWORK\n');
+fprintf('   Current : Statistical n-gram model\n');
+fprintf('   Suggest : LSTM or Transformer\n\n');
 
-% --- Launch UI ---
-fprintf('--- Launching UI ---\n');
+% --- 5. Launch UI ---
+fprintf('--- 5. Launching UI ---\n');
+fprintf('  Bigram  : type 1 word        e.g. "cat"\n');
+fprintf('  Trigram : type 2 words       e.g. "the cat"\n');
+fprintf('  Vector  : type any words     e.g. "the cat"\n');
+fprintf('  Double-click suggestion to append word and search again\n\n');
 launchUI(bigramModel, trigramModel, coMatrix, corpus.vocab);
