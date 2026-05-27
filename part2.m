@@ -79,23 +79,46 @@ function nextWord = predictBigram(model, word)
     inner      = model.bigram(word);
     nextWords  = keys(inner);
     nextCounts = cell2mat(values(inner));
-    [~, idx]   = max(nextCounts);
-    nextWord   = nextWords{idx};
+    
+    % Remove '.' from candidates
+dotMask    = ~strcmp(nextWords, '.');
+nextWords  = nextWords(dotMask);
+nextCounts = nextCounts(dotMask);
+    
+    if isempty(nextWords)
+        nextWord = 'unknown';
+        return;
+    end
+    [~, idx]  = max(nextCounts);
+    nextWord  = nextWords{idx};
 end
 
 % predictTrigram 
-function nextWord = predictTrigram(model, word1, word2)
+function [nextWord, prob] = predictTrigram(model, word1, word2)
     key = [word1 ' ' word2];
     if ~isKey(model.trigram, key)
         nextWord = 'unknown';
+        prob = 0;
         return;
     end
     inner      = model.trigram(key);
     nextWords  = keys(inner);
     nextCounts = cell2mat(values(inner));
-    [~, idx]   = max(nextCounts);
-    nextWord   = nextWords{idx};
+
+    dotMask    = ~strcmp(nextWords, '.');
+    nextWords  = nextWords(dotMask);
+    nextCounts = nextCounts(dotMask);
+
+    if isempty(nextWords)
+        nextWord = 'unknown';
+        prob = 0;
+        return;
+    end
+    [~, idx]  = max(nextCounts);
+    nextWord  = nextWords{idx};
+    prob      = nextCounts(idx) / sum(nextCounts);  % add this
 end
+
 
 % getLaplaceProb 
 function prob = getLaplaceProb(model, w1, w2, vocabSize)
@@ -123,55 +146,5 @@ fprintf('Bigram model built.\n');
 trigramModel        = buildTrigram(trainTok);
 fprintf('Trigram model built.\n\n');
 
-% show probability examples
-fprintf('=== Transition Probabilities ===\n');
-testPairs = {{'the','cat'}, {'the','dog'}, {'a','man'}};
-for i = 1:numel(testPairs)
-    w1   = testPairs{i}{1};
-    w2   = testPairs{i}{2};
-    prob = getProbability(bigramModel, w1, w2);
-    fprintf('P("%s"|"%s") = %.4f\n', w2, w1, prob);
-end
-fprintf('\n');
-
-% show smoothing examples
-fprintf('=== Laplace Smoothing ===\n');
-vocabSize = corpus.vocabSize;
-for i = 1:numel(testPairs)
-    w1   = testPairs{i}{1};
-    w2   = testPairs{i}{2};
-    prob = getLaplaceProb(bigramModel, w1, w2, vocabSize);
-    fprintf('Smoothed P("%s"|"%s") = %.4f\n', w2, w1, prob);
-end
-fprintf('\n');
 
 
-fprintf('=== INTERACTIVE NEXT WORD PREDICTOR ===\n');
-fprintf('1 word input  → Bigram prediction\n');
-fprintf('2 word input  → Trigram prediction\n');
-fprintf('Type "quit"   → Stop\n\n');
-
-while true
-    userInput  = input('Enter word(s): ', 's');
-
-    if strcmp(userInput, 'quit')
-        fprintf('Goodbye!\n');
-        break;
-    end
-
-    inputWords = strsplit(strtrim(userInput));
-    numWords   = numel(inputWords);
-
-    if numWords == 1
-        word   = inputWords{1};
-        result = predictBigram(bigramModel, word);
-        prob   = getProbability(bigramModel, word, result);
-        fprintf('Bigram  : "%s" → "%s" (prob: %.4f)\n\n', word, result, prob);
-
-    elseif numWords >= 2
-        word1  = inputWords{numWords-1};
-        word2  = inputWords{numWords};
-        result = predictTrigram(trigramModel, word1, word2);
-        fprintf('Trigram : "%s %s" → "%s"\n\n', word1, word2, result);
-    end
-end

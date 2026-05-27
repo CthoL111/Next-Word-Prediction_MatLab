@@ -2,7 +2,8 @@
 % Converts raw text into tokens, vocabulary, and frequency map
 function corpus = loadAndPreprocess(text)
     text   = lower(text);                         
-    text   = regexprep(text, '[^a-z\s]', '');     
+    text   = regexprep(text, '[^a-z\s\.]', '');   
+    text   = regexprep(text, '\.', ' . ');   
     tokens = strsplit(strtrim(text));              
     tokens = tokens(~cellfun('isempty', tokens));  
 

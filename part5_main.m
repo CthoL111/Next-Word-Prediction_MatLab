@@ -1,3 +1,9 @@
+run('part1.m');
+run('part2.m');
+run('part3.m');
+run('part4.m');
+
+
 % ============================================================
 % PART 5: Application and Documentation (15%)
 % ============================================================
@@ -110,6 +116,11 @@ function launchUI(bigramModel, trigramModel, coMatrix, vocab)
                         inner    = bigramModel.bigram(w1);
                         ws       = keys(inner);
                         counts   = cell2mat(values(inner));
+
+                        dotMask  = ~strcmp(ws, '.');
+                        ws       = ws(dotMask);
+                        counts   = counts(dotMask);
+
                         total    = sum(counts);
                         [~, idx] = sort(counts, 'descend');
                         topK     = min(5, numel(ws));
@@ -129,6 +140,11 @@ function launchUI(bigramModel, trigramModel, coMatrix, vocab)
                             inner    = trigramModel.trigram(key);
                             ws       = keys(inner);
                             counts   = cell2mat(values(inner));
+
+                            dotMask  = ~strcmp(ws, '.');
+                            ws       = ws(dotMask);
+                            counts   = counts(dotMask);
+
                             [~, idx] = sort(counts, 'descend');
                             topK     = min(5, numel(ws));
                             for k = 1:topK
@@ -141,6 +157,11 @@ function launchUI(bigramModel, trigramModel, coMatrix, vocab)
                             inner    = bigramModel.bigram(w1);
                             ws       = keys(inner);
                             counts   = cell2mat(values(inner));
+
+                            dotMask  = ~strcmp(ws, '.');
+                            ws       = ws(dotMask);
+                            counts   = counts(dotMask);
+
                             [~, idx] = sort(counts, 'descend');
                             topK     = min(5, numel(ws));
                             for k = 1:topK
@@ -181,6 +202,11 @@ function launchUI(bigramModel, trigramModel, coMatrix, vocab)
                         end
 
                         [sortedSims, sortedIdx] = sort(sims, 'descend');
+
+                        dotMask    = ~strcmp(vocab(sortedIdx), '.');
+                        sortedIdx  = sortedIdx(dotMask);
+                        sortedSims = sortedSims(dotMask);
+
                         topK = min(5, numel(vocab));
                         for k = 1:topK
                             preds{end+1} = sprintf('%-15s  (sim=%.4f)', ...
@@ -285,3 +311,6 @@ fprintf('  Trigram : type 2 words       e.g. "the cat"\n');
 fprintf('  Vector  : type any words     e.g. "the cat"\n');
 fprintf('  Double-click suggestion to append word and search again\n\n');
 launchUI(bigramModel, trigramModel, coMatrix, corpus.vocab);
+
+
+
