@@ -81,7 +81,8 @@ function nextWord = predictBigram(model, word)
     nextCounts = cell2mat(values(inner));
     
     % Remove '.' from candidates
-dotMask    = ~strcmp(nextWords, '.');
+sentMarker = corpus.lang;
+dotMask = ~strcmp(ws, '។') & ~strcmp(ws, '.');
 nextWords  = nextWords(dotMask);
 nextCounts = nextCounts(dotMask);
     
@@ -105,7 +106,8 @@ function [nextWord, prob] = predictTrigram(model, word1, word2)
     nextWords  = keys(inner);
     nextCounts = cell2mat(values(inner));
 
-    dotMask    = ~strcmp(nextWords, '.');
+    sentMarker = corpus.lang;
+    dotMask = ~strcmp(ws, '។') & ~strcmp(ws, '.');
     nextWords  = nextWords(dotMask);
     nextCounts = nextCounts(dotMask);
 
@@ -145,6 +147,3 @@ bigramModel         = buildBigram(trainTok);
 fprintf('Bigram model built.\n');
 trigramModel        = buildTrigram(trainTok);
 fprintf('Trigram model built.\n\n');
-
-
-

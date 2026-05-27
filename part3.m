@@ -58,8 +58,8 @@ function nextWord = predictByVector(coMatrix, vocab, word, topK)
     end
     sims(widx)              = -inf;
     [sortedSims, sortedIdx] = sort(sims, 'descend');
-
-    dotMask = ~strcmp(vocab(sortedIdx), '.');
+    
+    dotMask    = ~strcmp(vocab(sortedIdx), '.') & ~strcmp(vocab(sortedIdx), '។');
     sortedIdx  = sortedIdx(dotMask);
     sortedSims = sortedSims(dotMask);
 
@@ -97,11 +97,12 @@ fprintf('\n');
 % --- Co-occurrence for "cat" ---
 fprintf('--- Co-occurrence counts for "cat" ---\n');
 wordIndex = containers.Map(corpus.vocab, 1:numel(corpus.vocab));
-if isKey(wordIndex, 'cat')
-    catIdx = wordIndex('cat');
+sampleWord = corpus.vocab{2};
+if isKey(wordIndex, sampleWord)
+    catIdx = wordIndex(sampleWord);
     catRow = coMatrix(catIdx, :);
-    [sortedC, sortedI] = sort(catRow, 'descend');
-    fprintf('Words most common near "cat":\n');
+    [sortedC, sortedI] = sort(catRow, 'descend');  % ← add this line
+    fprintf('Words most common near "%s":\n', sampleWord);
     for k = 1:min(5, numel(corpus.vocab))
         if sortedC(k) > 0
             fprintf('  %-15s count = %.0f\n', corpus.vocab{sortedI(k)}, sortedC(k));
@@ -112,7 +113,7 @@ fprintf('\n');
 
 % --- Vector Similarity Predictions ---
 fprintf('--- Vector Similarity Predictions ---\n');
-testWords = {'cat', 'fish', 'bird'};
+testWords = corpus.vocab(2:min(4, numel(corpus.vocab)));
 for i = 1:numel(testWords)
     predictByVector(coMatrix, corpus.vocab, testWords{i}, 3);
 end
@@ -120,7 +121,7 @@ fprintf('\n');
 
 % --- Compare Bigram vs Vector (inline - no external function) ---
 fprintf('--- Comparison: Bigram vs Vector ---\n');
-compareWords = {'cat', 'the', 'a'};
+compareWords = corpus.vocab(2:min(4, numel(corpus.vocab)));
 fprintf('%-10s %-20s %-20s\n', 'Word', 'Bigram predicts', 'Vector predicts');
 fprintf('%s\n', repmat('-',1,50));
 

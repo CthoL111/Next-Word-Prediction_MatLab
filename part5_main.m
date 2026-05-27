@@ -1,7 +1,6 @@
 run('part1.m');
 run('part2.m');
 run('part3.m');
-run('part4.m');
 
 
 % ============================================================
@@ -27,7 +26,7 @@ function [bigramModel, trigramModel, coMatrix, vocab] = loadModel(filename)
 end
 
 % --- UI ---
-function launchUI(bigramModel, trigramModel, coMatrix, vocab)
+function launchUI(bigramModel, trigramModel, coMatrix, vocab, lang)
 
     fig = uifigure('Name', 'Next Word Predictor', ...
                    'Position', [200 150 540 320]);
@@ -81,6 +80,44 @@ function launchUI(bigramModel, trigramModel, coMatrix, vocab)
         'Position', [20 148 100 20], ...
         'FontWeight', 'bold');
 
+    % suggestion listbox
+    suggList = uilistbox(fig, ...
+        'Position', [20 20 500 125], ...
+        'Items', {}, ...
+        'FontSize', 13, ...
+        'DoubleClickedFcn', @(~,~) onSuggestionSelected());
+
+    drawnow;
+
+    % clear button
+    uibutton(fig, 'Text', 'Clear All', ...
+        'Position', [410 175 110 26], ...
+        'ButtonPushedFcn', @(~,~) clearAll());
+
+    % suggestions label
+    uilabel(fig, 'Text', 'Suggestions:', ...
+        'Position', [20 148 100 20], ...
+        'FontWeight', 'bold');
+
+    % suggestion listbox
+    suggList = uilistbox(fig, ...
+        'Position', [20 20 500 125], ...
+        'Items', {}, ...
+        'FontSize', 13, ...
+        'DoubleClickedFcn', @(~,~) onSuggestionSelected());
+
+    drawnow;  % ← correct place: after ALL UI components are built
+
+    % clear button
+    uibutton(fig, 'Text', 'Clear All', ...
+        'Position', [410 175 110 26], ...
+        'ButtonPushedFcn', @(~,~) clearAll());
+
+    % suggestions label
+    uilabel(fig, 'Text', 'Suggestions:', ...
+        'Position', [20 148 100 20], ...
+        'FontWeight', 'bold');
+
     % suggestion listbox — double click adds word to input and searches again
     suggList = uilistbox(fig, ...
         'Position', [20 20 500 125], ...
@@ -90,7 +127,7 @@ function launchUI(bigramModel, trigramModel, coMatrix, vocab)
 
     % ---- when user types ----
     function onInputChanged()
-        inputText = strtrim(lower(inputField.Value));
+        inputText = strtrim(inputField.Value);
 
         if ~strcmp(inputField.Value, inputText)
             inputField.Value = inputText;
@@ -101,6 +138,10 @@ function launchUI(bigramModel, trigramModel, coMatrix, vocab)
             return;
         end
 
+        % Normalize input same way as corpus preprocessing
+        inputText = regexprep(inputText, '[^\x{1780}-\x{17FF}a-z\s។\.]', '');
+        inputText = strtrim(inputText);
+        
         words       = strsplit(inputText);
         words       = words(~cellfun('isempty', words));
         numWords    = numel(words);
@@ -117,7 +158,7 @@ function launchUI(bigramModel, trigramModel, coMatrix, vocab)
                         ws       = keys(inner);
                         counts   = cell2mat(values(inner));
 
-                        dotMask  = ~strcmp(ws, '.');
+                        dotMask = ~strcmp(ws, '.') & ~strcmp(ws, '។');
                         ws       = ws(dotMask);
                         counts   = counts(dotMask);
 
@@ -141,7 +182,7 @@ function launchUI(bigramModel, trigramModel, coMatrix, vocab)
                             ws       = keys(inner);
                             counts   = cell2mat(values(inner));
 
-                            dotMask  = ~strcmp(ws, '.');
+                            dotMask = ~strcmp(ws, '.') & ~strcmp(ws, '។');
                             ws       = ws(dotMask);
                             counts   = counts(dotMask);
 
@@ -158,7 +199,7 @@ function launchUI(bigramModel, trigramModel, coMatrix, vocab)
                             ws       = keys(inner);
                             counts   = cell2mat(values(inner));
 
-                            dotMask  = ~strcmp(ws, '.');
+                            dotMask = ~strcmp(ws, '.') & ~strcmp(ws, '។');
                             ws       = ws(dotMask);
                             counts   = counts(dotMask);
 
@@ -203,7 +244,7 @@ function launchUI(bigramModel, trigramModel, coMatrix, vocab)
 
                         [sortedSims, sortedIdx] = sort(sims, 'descend');
 
-                        dotMask    = ~strcmp(vocab(sortedIdx), '.');
+                        dotMask    = ~strcmp(vocab(sortedIdx), '.') & ~strcmp(vocab(sortedIdx), '។');
                         sortedIdx  = sortedIdx(dotMask);
                         sortedSims = sortedSims(dotMask);
 
@@ -254,7 +295,6 @@ function launchUI(bigramModel, trigramModel, coMatrix, vocab)
         inputField.Value = '';
         suggList.Items   = {};
     end
-
 end
 
 % ============================================================
@@ -310,7 +350,7 @@ fprintf('  Bigram  : type 1 word        e.g. "cat"\n');
 fprintf('  Trigram : type 2 words       e.g. "the cat"\n');
 fprintf('  Vector  : type any words     e.g. "the cat"\n');
 fprintf('  Double-click suggestion to append word and search again\n\n');
-launchUI(bigramModel, trigramModel, coMatrix, corpus.vocab);
+launchUI(bigramModel, trigramModel, coMatrix, corpus.vocab, corpus.lang);
 
 
 
