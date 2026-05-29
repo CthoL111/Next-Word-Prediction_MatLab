@@ -1,7 +1,7 @@
 run('part1.m');
 run('part2.m');
 run('part3.m');
-
+run('part4.m');
 
 % ============================================================
 % PART 5: Application and Documentation (15%)
@@ -26,7 +26,7 @@ function [bigramModel, trigramModel, coMatrix, vocab] = loadModel(filename)
 end
 
 % --- UI ---
-function launchUI(bigramModel, trigramModel, coMatrix, vocab, lang)
+function launchUI(bigramModel, trigramModel, coMatrix, vocab, khmerVocab)
 
     fig = uifigure('Name', 'Next Word Predictor', ...
                    'Position', [200 150 540 320]);
@@ -87,64 +87,41 @@ function launchUI(bigramModel, trigramModel, coMatrix, vocab, lang)
         'FontSize', 13, ...
         'DoubleClickedFcn', @(~,~) onSuggestionSelected());
 
-    drawnow;
-
-    % clear button
-    uibutton(fig, 'Text', 'Clear All', ...
-        'Position', [410 175 110 26], ...
-        'ButtonPushedFcn', @(~,~) clearAll());
-
-    % suggestions label
-    uilabel(fig, 'Text', 'Suggestions:', ...
-        'Position', [20 148 100 20], ...
-        'FontWeight', 'bold');
-
-    % suggestion listbox
-    suggList = uilistbox(fig, ...
-        'Position', [20 20 500 125], ...
-        'Items', {}, ...
-        'FontSize', 13, ...
-        'DoubleClickedFcn', @(~,~) onSuggestionSelected());
-
     drawnow;  % ← correct place: after ALL UI components are built
-
-    % clear button
-    uibutton(fig, 'Text', 'Clear All', ...
-        'Position', [410 175 110 26], ...
-        'ButtonPushedFcn', @(~,~) clearAll());
-
-    % suggestions label
-    uilabel(fig, 'Text', 'Suggestions:', ...
-        'Position', [20 148 100 20], ...
-        'FontWeight', 'bold');
-
-    % suggestion listbox — double click adds word to input and searches again
-    suggList = uilistbox(fig, ...
-        'Position', [20 20 500 125], ...
-        'Items', {}, ...
-        'FontSize', 13, ...
-        'DoubleClickedFcn', @(~,~) onSuggestionSelected());
 
     % ---- when user types ----
     function onInputChanged()
         inputText = strtrim(inputField.Value);
-
-        if ~strcmp(inputField.Value, inputText)
-            inputField.Value = inputText;
-        end
 
         if isempty(inputText)
             suggList.Items = {};
             return;
         end
 
-        % Normalize input same way as corpus preprocessing
+        % Normalize input
         inputText = regexprep(inputText, '[^\x{1780}-\x{17FF}a-z\s។\.]', '');
         inputText = strtrim(inputText);
-        
-        words       = strsplit(inputText);
-        words       = words(~cellfun('isempty', words));
-        numWords    = numel(words);
+
+        % Split then re-segment any Khmer runs typed without spaces
+        rawWords      = strsplit(inputText);
+        rawWords      = rawWords(~cellfun('isempty', rawWords));
+        expandedWords = {};
+        for ri = 1:numel(rawWords)
+            w            = rawWords{ri};
+            isKhmerRun   = ~isempty(regexp(w, '^[\x{1780}-\x{17FF}។]+$', 'once'));
+            if isKhmerRun && numel(w) > 3
+                segs = segmentKhmer(w, khmerVocab);
+                if ~isempty(segs)
+                    expandedWords = [expandedWords, segs]; %#ok
+                else
+                    expandedWords{end+1} = w; %#ok
+                end
+            else
+                expandedWords{end+1} = w; %#ok
+            end
+        end
+        words    = expandedWords(~cellfun('isempty', expandedWords));
+        numWords = numel(words);
         modelChoice = modeDD.Value;
         preds       = {};
 
@@ -283,7 +260,15 @@ function launchUI(bigramModel, trigramModel, coMatrix, vocab, lang)
         if isempty(current)
             inputField.Value = word;
         else
-            inputField.Value = [current ' ' word];
+            % No space if current ends with Khmer character
+            lastChar = current(end);
+            isKhmerEnd = ~isempty(regexp(lastChar, '[\x{1780}-\x{17FF}។]', 'once'));
+            isKhmerWord = ~isempty(regexp(word, '^[\x{1780}-\x{17FF}។]+$', 'once'));
+            if isKhmerEnd && isKhmerWord
+                inputField.Value = [current word];
+            else
+                inputField.Value = [current ' ' word];
+            end
         end
 
         % trigger new search with updated input
@@ -297,6 +282,30 @@ function launchUI(bigramModel, trigramModel, coMatrix, vocab, lang)
     end
 end
 
+% --- Khmer Segmenter ---
+function tokens = segmentKhmer(text, khmerVocab)
+    tokens = {};
+    chars  = num2cell(text);
+    n      = numel(chars);
+    i      = 1;
+    while i <= n
+        matched = false;
+        for k = 1:numel(khmerVocab)
+            word  = khmerVocab{k};
+            wlen  = numel(word);
+            if i + wlen - 1 <= n
+                candidate = strjoin(chars(i : i+wlen-1), '');
+                if strcmp(candidate, word)
+                    tokens{end+1} = word; %#ok
+                    i = i + wlen;
+                    matched = true;
+                    break;
+                end
+            end
+        end
+        if ~matched, i = i + 1; end
+    end
+end
 % ============================================================
 % RUN PART 5
 % ============================================================
@@ -350,7 +359,7 @@ fprintf('  Bigram  : type 1 word        e.g. "cat"\n');
 fprintf('  Trigram : type 2 words       e.g. "the cat"\n');
 fprintf('  Vector  : type any words     e.g. "the cat"\n');
 fprintf('  Double-click suggestion to append word and search again\n\n');
-launchUI(bigramModel, trigramModel, coMatrix, corpus.vocab, corpus.lang);
+launchUI(bigramModel, trigramModel, coMatrix, corpus.vocab, khmerVocab);
 
 
 

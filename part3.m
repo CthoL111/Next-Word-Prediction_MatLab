@@ -136,12 +136,16 @@ for i = 1:numel(compareWords)
         ws         = keys(inner);
         counts     = cell2mat(values(inner));
 
-        dotMask = ~strcmp(ws, '.');
+        dotMask = ~strcmp(ws, '.') & ~strcmp(ws, '។');
         ws      = ws(dotMask);
         counts  = counts(dotMask);
 
-        [~, idx]   = max(counts);
-        bigramPred = ws{idx};
+        if isempty(ws)
+            bigramPred = 'unknown';
+        else
+            [~, idx]   = max(counts);
+            bigramPred = ws{idx};
+        end
     end
 
     % ---- vector inline ----
@@ -158,11 +162,14 @@ for i = 1:numel(compareWords)
                 sims(j) = dot(vec, other) / denom;
             end
         end
-        sims(widx)   = -inf;
+        sims(widx) = -inf;
+        dotMask    = ~strcmp(corpus.vocab, '.') & ~strcmp(corpus.vocab, '។');
+        sims(~dotMask) = -inf;
         [~, bestIdx] = max(sims);
         vectorPred   = corpus.vocab{bestIdx};
     end
     fprintf('%-10s %-20s %-20s\n', w, bigramPred, vectorPred);
 end
 fprintf('\n');
+
 

@@ -72,3 +72,9 @@ sortedWords = words(idx);
 fprintf('Most common words: ');
 fprintf('%s ', sortedWords{1:min(5, numel(sortedWords))});
 fprintf('\n\n');
+
+% ── Build sorted Khmer vocab for segmentation (longest match first) ──
+khmerVocab = corpus.vocab(cellfun(@(w) ...
+    ~isempty(regexp(w, '^[\x{1780}-\x{17FF}។]+$', 'once')), corpus.vocab));
+[~, lenIdx] = sort(cellfun(@numel, khmerVocab), 'descend');
+khmerVocab  = khmerVocab(lenIdx);

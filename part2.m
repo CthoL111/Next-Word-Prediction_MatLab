@@ -80,11 +80,10 @@ function nextWord = predictBigram(model, word)
     nextWords  = keys(inner);
     nextCounts = cell2mat(values(inner));
     
-    % Remove '.' from candidates
-sentMarker = corpus.lang;
-dotMask = ~strcmp(ws, '។') & ~strcmp(ws, '.');
-nextWords  = nextWords(dotMask);
-nextCounts = nextCounts(dotMask);
+
+    dotMask    = ~strcmp(nextWords, '។') & ~strcmp(nextWords, '.');
+    nextWords  = nextWords(dotMask);
+    nextCounts = nextCounts(dotMask);
     
     if isempty(nextWords)
         nextWord = 'unknown';
@@ -106,8 +105,7 @@ function [nextWord, prob] = predictTrigram(model, word1, word2)
     nextWords  = keys(inner);
     nextCounts = cell2mat(values(inner));
 
-    sentMarker = corpus.lang;
-    dotMask = ~strcmp(ws, '។') & ~strcmp(ws, '.');
+    dotMask    = ~strcmp(nextWords, '។') & ~strcmp(nextWords, '.');
     nextWords  = nextWords(dotMask);
     nextCounts = nextCounts(dotMask);
 
@@ -142,8 +140,19 @@ end
 
 % build models 
 fprintf('=== PART 2: N-gram Models ===\n');
-[trainTok, testTok] = splitCorpus(corpus.tokens, 0.8);
+[trainTok, testTok] = splitCorpus(corpus.tokens, 0.9);
 bigramModel         = buildBigram(trainTok);
 fprintf('Bigram model built.\n');
 trigramModel        = buildTrigram(trainTok);
 fprintf('Trigram model built.\n\n');
+
+% show probability examples  ← ADD THIS
+fprintf('=== Transition Probabilities ===\n');
+testPairs = {{'the','cat'}, {'the','dog'}, {'a','man'}};
+for i = 1:numel(testPairs)
+    w1   = testPairs{i}{1};
+    w2   = testPairs{i}{2};
+    prob = getLaplaceProb(bigramModel, w1, w2, corpus.vocabSize);
+    fprintf('Smoothed P("%s"|"%s") = %.4f\n', w2, w1, prob);
+end
+fprintf('\n');
