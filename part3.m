@@ -42,30 +42,50 @@ function sim = cosineSim(vec1, vec2)
 end
 
 % --- Predict by Vector Similarity ---
-function nextWord = predictByVector(coMatrix, vocab, word, topK)
+function nextWord = predictByVector(coMatrix, vocab, words, topK)
     if nargin < 4, topK = 3; end
+    % accept string or cell array
+    if ischar(words), words = strsplit(words); end
     wordIndex = containers.Map(vocab, 1:numel(vocab));
-    if ~isKey(wordIndex, word)
+
+    % average all input word vectors
+    combined   = zeros(1, numel(vocab));
+    validCount = 0;
+    for wi = 1:numel(words)
+        if isKey(wordIndex, words{wi})
+            combined = combined + coMatrix(wordIndex(words{wi}), :);
+            validCount = validCount + 1;
+        else
+            fprintf('Word "%s" not found.\n', words{wi});
+        end
+    end
+
+    if validCount == 0
         nextWord = {};
-        fprintf('Word "%s" not found.\n', word);
         return;
     end
-    widx = wordIndex(word);
-    vec  = coMatrix(widx, :);
+    combined = combined / validCount;
+
+    % compute similarity
     sims = zeros(1, numel(vocab));
     for i = 1:numel(vocab)
-        sims(i) = cosineSim(vec, coMatrix(i,:));
+        sims(i) = cosineSim(combined, coMatrix(i,:));
     end
-    sims(widx)              = -inf;
-    [sortedSims, sortedIdx] = sort(sims, 'descend');
-    
-    dotMask    = ~strcmp(vocab(sortedIdx), '.') & ~strcmp(vocab(sortedIdx), '។');
-    sortedIdx  = sortedIdx(dotMask);
-    sortedSims = sortedSims(dotMask);
 
+    % exclude input words and dots
+    for wi = 1:numel(words)
+        if isKey(wordIndex, words{wi})
+            sims(wordIndex(words{wi})) = -inf;
+        end
+    end
+    dotMask    = ~strcmp(vocab, '.') & ~strcmp(vocab, '។');
+    sims(~dotMask) = -inf;
+
+    [sortedSims, sortedIdx] = sort(sims, 'descend');
     topK     = min(topK, numel(vocab));
     nextWord = vocab(sortedIdx(1:topK));
-    fprintf('\nVector predictions after "%s":\n', word);
+
+    fprintf('\nVector predictions after "%s":\n', strjoin(words, ' '));
     for k = 1:topK
         fprintf('  %d. %-15s (sim=%.4f)\n', k, nextWord{k}, sortedSims(k));
     end
@@ -82,7 +102,7 @@ oneHot  = oneHotEncode(corpus.vocab);
 exWords = corpus.vocab(1:min(3, numel(corpus.vocab)));
 for i = 1:numel(exWords)
     vec = oneHot(exWords{i});
-    fprintf('"%s" → [', exWords{i});
+    fprintf('"%s" -> [', exWords{i});
     fprintf('%d ', vec(1:min(10,end)));
     fprintf('...]\n');
 end
@@ -97,7 +117,15 @@ fprintf('\n');
 % --- Co-occurrence for "cat" ---
 fprintf('--- Co-occurrence counts for "cat" ---\n');
 wordIndex = containers.Map(corpus.vocab, 1:numel(corpus.vocab));
-sampleWord = corpus.vocab{2};
+% pick first real word (not dot)
+sampleWord = '';
+for si = 1:numel(corpus.vocab)
+    w = corpus.vocab{si};
+    if ~strcmp(w, '.') && ~strcmp(w, '។') && numel(w) > 1
+        sampleWord = w;
+        break;
+    end
+end
 if isKey(wordIndex, sampleWord)
     catIdx = wordIndex(sampleWord);
     catRow = coMatrix(catIdx, :);
@@ -109,37 +137,33 @@ if isKey(wordIndex, sampleWord)
         end
     end
 end
-fprintf('\n');
+
 
 % --- Vector Similarity Predictions ---
-fprintf('--- Vector Similarity Predictions ---\n');
-testWords = corpus.vocab(2:min(4, numel(corpus.vocab)));
+% single word examples
+testWords = {'cat', 'the', 'bird'};
 for i = 1:numel(testWords)
     predictByVector(coMatrix, corpus.vocab, testWords{i}, 3);
 end
-fprintf('\n');
-
-% --- Compare Bigram vs Vector (inline - no external function) ---
+fprintf("\n");
+% --- Compare Bigram vs Vector ---
 fprintf('--- Comparison: Bigram vs Vector ---\n');
-compareWords = corpus.vocab(2:min(4, numel(corpus.vocab)));
+compareWords = {'cat', 'the', 'a'};
 fprintf('%-10s %-20s %-20s\n', 'Word', 'Bigram predicts', 'Vector predicts');
 fprintf('%s\n', repmat('-',1,50));
-
 for i = 1:numel(compareWords)
     w = compareWords{i};
 
-    % ---- bigram inline ----
+    % bigram
     if ~isKey(bigramModel.bigram, w)
         bigramPred = 'unknown';
     else
-        inner      = bigramModel.bigram(w);
-        ws         = keys(inner);
-        counts     = cell2mat(values(inner));
-
+        inner   = bigramModel.bigram(w);
+        ws      = keys(inner);
+        counts  = cell2mat(values(inner));
         dotMask = ~strcmp(ws, '.') & ~strcmp(ws, '។');
         ws      = ws(dotMask);
         counts  = counts(dotMask);
-
         if isempty(ws)
             bigramPred = 'unknown';
         else
@@ -148,7 +172,7 @@ for i = 1:numel(compareWords)
         end
     end
 
-    % ---- vector inline ----
+    % vector
     if ~isKey(wordIndex, w)
         vectorPred = 'unknown';
     else
@@ -168,8 +192,6 @@ for i = 1:numel(compareWords)
         [~, bestIdx] = max(sims);
         vectorPred   = corpus.vocab{bestIdx};
     end
-    fprintf('%-10s %-20s %-20s\n', w, bigramPred, vectorPred);
+    fprintf('%-14s %-30s %-10s\n', w, bigramPred, vectorPred);
 end
 fprintf('\n');
-
-

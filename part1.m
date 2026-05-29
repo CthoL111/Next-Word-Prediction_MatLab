@@ -27,9 +27,20 @@ function corpus = loadAndPreprocess(text, lang)
             corpus.freqMap(w) = 1;
         end
     end
-
+    if strcmp(lang, 'khmer')
+        fprintf('\n=== Khmer CORPUS ===\n');
+    else
+        fprintf('\n=== English CORPUS ===\n');
+    end
     fprintf('Vocabulary size : %d\n', corpus.vocabSize);
     fprintf('Total tokens    : %d\n', numel(tokens));
+    % top 5 words per language
+    w_keys = keys(corpus.freqMap);
+    w_vals = cell2mat(values(corpus.freqMap));
+    [~, widx] = sort(w_vals, 'descend');
+    fprintf('Most common     : ');
+    fprintf('%s ', w_keys{widx(1:min(5,numel(w_keys)))});
+    fprintf('\n');
 end
 
 % ── Load English corpus ──────────────────────────────────────
@@ -59,18 +70,13 @@ for i = 1:numel(corpus.tokens)
     end
 end
 
-fprintf('\n=== COMBINED CORPUS ===\n');
+fprintf('\n=== Khmer CORPUS ===\n');
 fprintf('Vocabulary size : %d\n', corpus.vocabSize);
 fprintf('Total tokens    : %d\n', numel(corpus.tokens));
 
-% ── Top word frequencies ─────────────────────────────────────
-words  = keys(corpus.freqMap);
-counts = cell2mat(values(corpus.freqMap));
-[sortedCounts, idx] = sort(counts, 'descend');
-sortedWords = words(idx);
-
-fprintf('Most common words: ');
-fprintf('%s ', sortedWords{1:min(5, numel(sortedWords))});
+fprintf('\n=== COMBINED CORPUS ===\n');
+fprintf('All vocabulary size : %d\n', corpus.vocabSize);
+fprintf('All tokens    : %d\n', numel(corpus.tokens));
 fprintf('\n\n');
 
 % ── Build sorted Khmer vocab for segmentation (longest match first) ──

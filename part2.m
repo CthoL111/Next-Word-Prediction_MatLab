@@ -140,14 +140,73 @@ end
 
 % build models 
 fprintf('=== PART 2: N-gram Models ===\n');
-[trainTok, testTok] = splitCorpus(corpus.tokens, 0.9);
+
+% ★ Split each language separately 80/20
+[trainEn, testEn] = splitCorpus(corpusEn.tokens, 0.8);
+[trainKh, testKh] = splitCorpus(corpusKh.tokens, 0.8);
+
+% ★ Combine after splitting
+trainTok = [trainEn, trainKh];
+testTok  = [testEn,  testKh];
+
 bigramModel         = buildBigram(trainTok);
 fprintf('Bigram model built.\n');
 trigramModel        = buildTrigram(trainTok);
 fprintf('Trigram model built.\n\n');
 
-% show probability examples  ← ADD THIS
-fprintf('=== Transition Probabilities ===\n');
+% === Bigram Examples ===
+fprintf('=== Bigram Examples ===\n');
+fprintf('(input 1 word -> predict next word)\n\n');
+bigramTests = {'the', 'cat', 'a', 'dog', 'bird'};
+for i = 1:numel(bigramTests)
+    w = bigramTests{i};
+    if isKey(bigramModel.bigram, w)
+        inner   = bigramModel.bigram(w);
+        ws      = keys(inner);
+        counts  = cell2mat(values(inner));
+        dotMask = ~strcmp(ws, '.') & ~strcmp(ws, '។');
+        ws      = ws(dotMask);
+        counts  = counts(dotMask);
+        if ~isempty(ws)
+            total   = sum(counts);
+            [~, idx] = max(counts);
+            prob    = counts(idx) / total;
+            fprintf('"%s" -> "%s"  (prob: %.4f)\n', w, ws{idx}, prob);
+        end
+    end
+end
+fprintf('\n');
+
+% === Trigram Examples ===
+fprintf('=== Trigram Examples ===\n');
+fprintf('(input 2 words -> predict next word)\n\n');
+trigramTests = {{'the','cat'}, {'the','dog'}, {'a','bird'}, {'cat','ate'}, {'the','river'}};
+for i = 1:numel(trigramTests)
+    w1  = trigramTests{i}{1};
+    w2  = trigramTests{i}{2};
+    key = [w1 ' ' w2];
+    if isKey(trigramModel.trigram, key)
+        inner   = trigramModel.trigram(key);
+        ws      = keys(inner);
+        counts  = cell2mat(values(inner));
+        dotMask = ~strcmp(ws, '.') & ~strcmp(ws, '។');
+        ws      = ws(dotMask);
+        counts  = counts(dotMask);
+        if ~isempty(ws)
+            [~, idx] = max(counts);
+            total    = sum(counts);
+            prob     = counts(idx) / total;
+            fprintf('"%s %s" -> "%s"  (prob: %.4f)\n', w1, w2, ws{idx}, prob);
+        end
+    else
+        fprintf('"%s %s" -> unknown\n', w1, w2);
+    end
+end
+fprintf('\n');
+
+% === Smoothing Examples ===
+fprintf('=== Laplace Smoothing ===\n');
+fprintf('(handles unseen word pairs)\n\n');
 testPairs = {{'the','cat'}, {'the','dog'}, {'a','man'}};
 for i = 1:numel(testPairs)
     w1   = testPairs{i}{1};

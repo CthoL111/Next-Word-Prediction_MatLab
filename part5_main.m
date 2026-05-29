@@ -100,6 +100,8 @@ function launchUI(bigramModel, trigramModel, coMatrix, vocab, khmerVocab)
 
         % Normalize input
         inputText = regexprep(inputText, '[^\x{1780}-\x{17FF}a-z\s។\.]', '');
+        inputText = regexprep(inputText, '\.', ' . ');   % ← space around .
+        inputText = regexprep(inputText, '។', ' ។ ');   % ← space around ។
         inputText = strtrim(inputText);
 
         % Split then re-segment any Khmer runs typed without spaces
@@ -130,6 +132,18 @@ function launchUI(bigramModel, trigramModel, coMatrix, vocab, khmerVocab)
 
                 case 'Bigram'
                     w1 = words{end};
+                    % sentence complete check
+                    if isKey(bigramModel.bigram, w1)
+                        inner_check = bigramModel.bigram(w1);
+                        ws_check    = keys(inner_check);
+                        cnt_check   = cell2mat(values(inner_check));
+                        dotCount    = sum(cnt_check(strcmp(ws_check, '.') | strcmp(ws_check, '។')));
+                        totalCount  = sum(cnt_check);
+                        if dotCount / totalCount >= 0.5
+                            suggList.Items = {'(sentence complete)'};
+                            return;
+                        end
+                    end
                     if isKey(bigramModel.bigram, w1)
                         inner    = bigramModel.bigram(w1);
                         ws       = keys(inner);
@@ -155,6 +169,17 @@ function launchUI(bigramModel, trigramModel, coMatrix, vocab, khmerVocab)
                         w2  = words{end};
                         key = [w1 ' ' w2];
                         if isKey(trigramModel.trigram, key)
+                            inner_check = trigramModel.trigram(key);
+                            ws_check    = keys(inner_check);
+                            cnt_check   = cell2mat(values(inner_check));
+                            dotCount    = sum(cnt_check(strcmp(ws_check, '.') | strcmp(ws_check, '។')));
+                            totalCount  = sum(cnt_check);
+                            if dotCount / totalCount >= 0.5
+                                suggList.Items = {'(sentence complete)'};
+                                return;
+                            end
+                        end
+                        if isKey(trigramModel.trigram, key)
                             inner    = trigramModel.trigram(key);
                             ws       = keys(inner);
                             counts   = cell2mat(values(inner));
@@ -163,27 +188,44 @@ function launchUI(bigramModel, trigramModel, coMatrix, vocab, khmerVocab)
                             ws       = ws(dotMask);
                             counts   = counts(dotMask);
 
+                            total    = sum(counts);
                             [~, idx] = sort(counts, 'descend');
                             topK     = min(5, numel(ws));
                             for k = 1:topK
-                                preds{end+1} = ws{idx(k)}; %#ok
+                                p = counts(idx(k)) / total;
+                                preds{end+1} = sprintf('%-15s  (%.2f%%)', ws{idx(k)}, p*100); %#ok
                             end
                         end
-                    else
+                        else
+                        % 1 word + Trigram → auto switch to Bigram
+                        modeDD.Value = 'Bigram';
                         w1 = words{end};
+                        % sentence complete check
+                        if isKey(bigramModel.bigram, w1)
+                            inner_check = bigramModel.bigram(w1);
+                            ws_check    = keys(inner_check);
+                            cnt_check   = cell2mat(values(inner_check));
+                            dotCount    = sum(cnt_check(strcmp(ws_check, '.') | strcmp(ws_check, '។')));
+                            totalCount  = sum(cnt_check);
+                            if dotCount / totalCount >= 0.5
+                                suggList.Items = {'(sentence complete)'};
+                                return;
+                            end
+                        end
                         if isKey(bigramModel.bigram, w1)
                             inner    = bigramModel.bigram(w1);
                             ws       = keys(inner);
                             counts   = cell2mat(values(inner));
-
-                            dotMask = ~strcmp(ws, '.') & ~strcmp(ws, '។');
+                            dotMask  = ~strcmp(ws, '.') & ~strcmp(ws, '។');
                             ws       = ws(dotMask);
                             counts   = counts(dotMask);
-
+                            total    = sum(counts);
                             [~, idx] = sort(counts, 'descend');
                             topK     = min(5, numel(ws));
                             for k = 1:topK
-                                preds{end+1} = ws{idx(k)}; %#ok
+                                p = counts(idx(k)) / total;
+                                preds{end+1} = sprintf('%-15s  (%.2f%%)', ...
+                                    ws{idx(k)}, p*100); %#ok
                             end
                         end
                     end
@@ -219,6 +261,14 @@ function launchUI(bigramModel, trigramModel, coMatrix, vocab, khmerVocab)
                             end
                         end
 
+                        % sentence complete check
+                        dotMask_pre = strcmp(vocab, '.') | strcmp(vocab, '។');
+                        allDot      = all(sims(~dotMask_pre) == -inf | sims(~dotMask_pre) == 0);
+                        if allDot
+                            suggList.Items = {'(sentence complete)'};
+                            return;
+                        end
+
                         [sortedSims, sortedIdx] = sort(sims, 'descend');
 
                         dotMask    = ~strcmp(vocab(sortedIdx), '.') & ~strcmp(vocab(sortedIdx), '។');
@@ -247,7 +297,7 @@ function launchUI(bigramModel, trigramModel, coMatrix, vocab, khmerVocab)
     % ---- double click: append word to input then search again ----
     function onSuggestionSelected()
         selected = suggList.Value;
-        if isempty(selected) || strcmp(selected, '(no suggestions found)')
+        if isempty(selected) || strcmp(selected, '(no suggestions found)') || strcmp(selected, '(sentence complete)')
             return;
         end
 
