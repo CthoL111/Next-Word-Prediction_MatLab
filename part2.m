@@ -56,7 +56,12 @@ function model = buildTrigram(tokens)
 end
 
 % getProbability 
-function prob = getProbability(model, w1, w2)
+function prob = getProbability(model, w1, w2, lang)
+    isKhmer = @(w) ~isempty(regexp(w, '^[\x{1780}-\x{17FF}។]+$', 'once'));
+    if nargin == 4
+        if strcmp(lang, 'khmer') && ~isKhmer(w1), prob = 0; return; end
+        if strcmp(lang, 'english') && isKhmer(w1), prob = 0; return; end
+    end
     if ~isKey(model.bigram, w1)
         prob = 0;
         return;
@@ -64,7 +69,7 @@ function prob = getProbability(model, w1, w2)
     inner = model.bigram(w1);
     total = model.unigram(w1);
     if isKey(inner, w2)
-        prob = inner(w2) / total;  % count / total = probability
+        prob = inner(w2) / total;
     else
         prob = 0;
     end
@@ -157,6 +162,8 @@ fprintf('Trigram model built.\n\n');
 % === Bigram Examples ===
 fprintf('=== Bigram Examples ===\n');
 fprintf('(input 1 word -> predict next word)\n\n');
+
+fprintf('[ English ]\n');
 bigramTests = {'the', 'cat', 'a', 'dog', 'bird'};
 for i = 1:numel(bigramTests)
     w = bigramTests{i};
@@ -168,11 +175,33 @@ for i = 1:numel(bigramTests)
         ws      = ws(dotMask);
         counts  = counts(dotMask);
         if ~isempty(ws)
-            total   = sum(counts);
+            total    = sum(counts);
             [~, idx] = max(counts);
-            prob    = counts(idx) / total;
+            prob     = counts(idx) / total;
             fprintf('"%s" -> "%s"  (prob: %.4f)\n', w, ws{idx}, prob);
         end
+    end
+end
+
+fprintf('\n[ Khmer ]\n');
+bigramTestsKh = {'ភាសា', 'ខ្មែរ', 'ជា', 'នៅ', 'ការ'};
+for i = 1:numel(bigramTestsKh)
+    w = bigramTestsKh{i};
+    if isKey(bigramModel.bigram, w)
+        inner   = bigramModel.bigram(w);
+        ws      = keys(inner);
+        counts  = cell2mat(values(inner));
+        dotMask = ~strcmp(ws, '។') & ~strcmp(ws, '.');
+        ws      = ws(dotMask);
+        counts  = counts(dotMask);
+        if ~isempty(ws)
+            total    = sum(counts);
+            [~, idx] = max(counts);
+            prob     = counts(idx) / total;
+            fprintf('"%s" -> "%s"  (prob: %.4f)\n', w, ws{idx}, prob);
+        end
+    else
+        fprintf('"%s" -> unknown\n', w);
     end
 end
 fprintf('\n');
@@ -180,6 +209,8 @@ fprintf('\n');
 % === Trigram Examples ===
 fprintf('=== Trigram Examples ===\n');
 fprintf('(input 2 words -> predict next word)\n\n');
+
+fprintf('[ English ]\n');
 trigramTests = {{'the','cat'}, {'the','dog'}, {'a','bird'}, {'cat','ate'}, {'the','river'}};
 for i = 1:numel(trigramTests)
     w1  = trigramTests{i}{1};
@@ -202,16 +233,52 @@ for i = 1:numel(trigramTests)
         fprintf('"%s %s" -> unknown\n', w1, w2);
     end
 end
+
+fprintf('\n[ Khmer ]\n');
+trigramTestsKh = {{'ភាសា','ខ្មែរ'}, {'ជា','ភាសា'}, {'នៅ','ក្នុង'}, {'ភាសា','ខ្មែរ'}, {'របស់','ជន'}};
+for i = 1:numel(trigramTestsKh)
+    w1  = trigramTestsKh{i}{1};
+    w2  = trigramTestsKh{i}{2};
+    key = [w1 ' ' w2];
+    if isKey(trigramModel.trigram, key)
+        inner   = trigramModel.trigram(key);
+        ws      = keys(inner);
+        counts  = cell2mat(values(inner));
+        dotMask = ~strcmp(ws, '។') & ~strcmp(ws, '.');
+        ws      = ws(dotMask);
+        counts  = counts(dotMask);
+        if ~isempty(ws)
+            [~, idx] = max(counts);
+            total    = sum(counts);
+            prob     = counts(idx) / total;
+            fprintf('"%s %s" -> "%s"  (prob: %.4f)\n', w1, w2, ws{idx}, prob);
+        end
+    else
+        fprintf('"%s %s" -> unknown\n', w1, w2);
+    end
+end
 fprintf('\n');
+
 
 % === Smoothing Examples ===
 fprintf('=== Laplace Smoothing ===\n');
 fprintf('(handles unseen word pairs)\n\n');
-testPairs = {{'the','cat'}, {'the','dog'}, {'a','man'}};
-for i = 1:numel(testPairs)
-    w1   = testPairs{i}{1};
-    w2   = testPairs{i}{2};
-    prob = getLaplaceProb(bigramModel, w1, w2, corpus.vocabSize);
+
+fprintf('[ English ]\n');
+testPairsEn = {{'the','cat'}, {'the','dog'}, {'a','man'}};
+for i = 1:numel(testPairsEn)
+    w1   = testPairsEn{i}{1};
+    w2   = testPairsEn{i}{2};
+    prob = getLaplaceProb(bigramModel, w1, w2, corpusEn.vocabSize);
+    fprintf('Smoothed P("%s"|"%s") = %.4f\n', w2, w1, prob);
+end
+
+fprintf('\n[ Khmer ]\n');
+testPairsKh = {{'ភាសា','ខ្មែរ'}, {'ជា','ភាសា'}, {'នៅ','ក្នុង'}};
+for i = 1:numel(testPairsKh)
+    w1   = testPairsKh{i}{1};
+    w2   = testPairsKh{i}{2};
+    prob = getLaplaceProb(bigramModel, w1, w2, corpusKh.vocabSize);
     fprintf('Smoothed P("%s"|"%s") = %.4f\n', w2, w1, prob);
 end
 fprintf('\n');

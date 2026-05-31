@@ -70,10 +70,6 @@ for i = 1:numel(corpus.tokens)
     end
 end
 
-fprintf('\n=== Khmer CORPUS ===\n');
-fprintf('Vocabulary size : %d\n', corpus.vocabSize);
-fprintf('Total tokens    : %d\n', numel(corpus.tokens));
-
 fprintf('\n=== COMBINED CORPUS ===\n');
 fprintf('All vocabulary size : %d\n', corpus.vocabSize);
 fprintf('All tokens    : %d\n', numel(corpus.tokens));

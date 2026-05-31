@@ -138,16 +138,24 @@ if isKey(wordIndex, sampleWord)
     end
 end
 
-
 % --- Vector Similarity Predictions ---
-% single word examples
+fprintf('[ English ]\n');
 testWords = {'cat', 'the', 'bird'};
 for i = 1:numel(testWords)
     predictByVector(coMatrix, corpus.vocab, testWords{i}, 3);
 end
-fprintf("\n");
+
+fprintf('\n[ Khmer ]\n');
+testWordsKh = {'ភាសា', 'ខ្មែរ', 'ការ'};
+for i = 1:numel(testWordsKh)
+    predictByVector(coMatrix, corpus.vocab, testWordsKh{i}, 3);
+end
+fprintf('\n');
+
 % --- Compare Bigram vs Vector ---
 fprintf('--- Comparison: Bigram vs Vector ---\n');
+
+fprintf('\n[ English ]\n');
 compareWords = {'cat', 'the', 'a'};
 fprintf('%-10s %-20s %-20s\n', 'Word', 'Bigram predicts', 'Vector predicts');
 fprintf('%s\n', repmat('-',1,50));
@@ -188,6 +196,54 @@ for i = 1:numel(compareWords)
         end
         sims(widx) = -inf;
         dotMask    = ~strcmp(corpus.vocab, '.') & ~strcmp(corpus.vocab, '។');
+        sims(~dotMask) = -inf;
+        [~, bestIdx] = max(sims);
+        vectorPred   = corpus.vocab{bestIdx};
+    end
+    fprintf('%-14s %-30s %-10s\n', w, bigramPred, vectorPred);
+end
+
+fprintf('\n[ Khmer ]\n');
+compareWordsKh = {'ភាសា', 'ខ្មែរ', 'ជា'};
+fprintf('%-10s %-20s %-20s\n', 'Word', 'Bigram predicts', 'Vector predicts');
+fprintf('%s\n', repmat('-',1,50));
+for i = 1:numel(compareWordsKh)
+    w = compareWordsKh{i};
+
+    % bigram
+    if ~isKey(bigramModel.bigram, w)
+        bigramPred = 'unknown';
+    else
+        inner   = bigramModel.bigram(w);
+        ws      = keys(inner);
+        counts  = cell2mat(values(inner));
+        dotMask = ~strcmp(ws, '។') & ~strcmp(ws, '.');
+        ws      = ws(dotMask);
+        counts  = counts(dotMask);
+        if isempty(ws)
+            bigramPred = 'unknown';
+        else
+            [~, idx]   = max(counts);
+            bigramPred = ws{idx};
+        end
+    end
+
+    % vector
+    if ~isKey(wordIndex, w)
+        vectorPred = 'unknown';
+    else
+        widx = wordIndex(w);
+        vec  = coMatrix(widx, :);
+        sims = zeros(1, numel(corpus.vocab));
+        for j = 1:numel(corpus.vocab)
+            other = coMatrix(j,:);
+            denom = norm(vec) * norm(other);
+            if denom > 0
+                sims(j) = dot(vec, other) / denom;
+            end
+        end
+        sims(widx) = -inf;
+        dotMask    = ~strcmp(corpus.vocab, '។') & ~strcmp(corpus.vocab, '.');
         sims(~dotMask) = -inf;
         [~, bestIdx] = max(sims);
         vectorPred   = corpus.vocab{bestIdx};
