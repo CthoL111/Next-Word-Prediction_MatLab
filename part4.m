@@ -9,7 +9,7 @@ function acc = evaluateBigram(model, testTokens)
     for i = 1:numel(testTokens)-1
         w1     = testTokens{i};
         actual = testTokens{i+1};
-        if strcmp(actual, '.'), total = total + 1; continue; end
+        if strcmp(actual, '.') || strcmp(actual, '។'), total = total + 1; continue; end
         if ~isKey(model.bigram, w1), total = total + 1; continue; end
 
         inner     = model.bigram(w1);
@@ -36,7 +36,7 @@ function acc = evaluateTrigram(model, testTokens)
         w1     = testTokens{i};
         w2     = testTokens{i+1};
         actual = testTokens{i+2};
-        if strcmp(actual, '.'), total = total + 1; continue; end
+        if strcmp(actual, '.') || strcmp(actual, '។'), total = total + 1; continue; end
         key = [w1 ' ' w2];
         if ~isKey(model.trigram, key), total = total + 1; continue; end
 
@@ -64,7 +64,7 @@ function acc = evaluateVector(coMatrix, vocab, testTokens)
     for i = 1:numel(testTokens)-1
         w1     = testTokens{i};
         actual = testTokens{i+1};
-        if strcmp(actual, '.'), total = total + 1; continue; end
+        if strcmp(actual, '.') || strcmp(actual, '។'), total = total + 1; continue; end
         if ~isKey(wordIndex, w1), total = total + 1; continue; end
 
         widx = wordIndex(w1);
